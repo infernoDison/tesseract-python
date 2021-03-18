@@ -4,6 +4,8 @@ import math
 
 from tesseract import canonical
 
+import networkx as nx
+
 
 class Algorithm:
     def __init__(self, out, max=math.inf):
@@ -26,6 +28,9 @@ class Algorithm:
 
     def _inc_found(self):
         self.num_found += 1
+
+    def _inc_found_x(self, x):
+        self.num_found += x
 
     def reset_stats(self):
         self.num_filters = 0
@@ -100,6 +105,84 @@ class CycleFinding(Algorithm):
         for cycle in cycles:
             if len(cycle) == len(e):
                 return True
+
+'''
+class ExamplePatternFinding(Algorithm):
+    def __init__(self, out, max=math.inf):
+        super().__init__(out, 4)
+
+    def filter(self, e, G, last_v):
+        super()._inc_filter()
+        return True
+
+    def process(self, e, G):
+        
+        if len(e) == 4:
+            ret = ExamplePatternFinding._is_cycle(e, G)
+            if ret == 1:
+                self._inc_found()
+            elif ret == 2:
+                self._inc_found_x(5)
+            else:
+                return False
+            self.out.found(e, G, tpe='%d-cycle' % len(e))
+
+    @staticmethod
+    def _is_cycle(e, G):
+        count_2 = 0
+        count_3 = 0
+        for i in range(4):
+            curr_count = len([edge[1] for edge in G.edges(e[i]) if edge[1] in e])
+            if curr_count >= 2:
+                count_2 += 1
+            if curr_count >= 3:
+                count_3 += 1
+        if count_2 == 4 and count_3 == 2:
+            return 1
+        elif count_2 == 4 and count_3 == 4:
+            return 2
+        return 0
+
+'''
+class ExamplePatternFinding(Algorithm):
+    def __init__(self, out, max=math.inf):
+        super().__init__(out, 3)
+
+    def filter(self, e, G, last_v):
+        super()._inc_filter()
+        v = last_v if last_v is not None else e[-1]
+        for u in e:
+            if u != v and not G.has_edge(u, v):
+                return False
+        return True
+
+    def process(self, e, G):
+        if len(e) == 2:
+            neighbor = nx.common_neighbors(G, e[0], e[1])
+            x = sum(1 for _ in neighbor)
+            if x >= 2:
+                #print(list(neighbor))
+                self._inc_found_x(x * (x-1) / 2)
+                self.out.found(e, G, tpe='%d-found' % len(e))
+                return True
+        elif len(e) == 3:
+            has_match = False
+            neighbor = nx.common_neighbors(G, e[0], e[-1])
+            x = sum(1 for _ in neighbor)
+            if x >= 2:
+                #print(list(neighbor))
+                self._inc_found_x(x-1)
+                self.out.found(e, G, tpe='%d-found' % len(e))
+                has_match = True
+            neighbor = nx.common_neighbors(G, e[1], e[-1])
+            x = sum(1 for _ in neighbor)
+            if x >= 2:
+                #print(list(neighbor))
+                self._inc_found_x(x-1)
+                self.out.found(e, G, tpe='%d-found' % len(e))
+                has_match = True
+            return has_match
+        return False
 
 
 class ExampleTree(Algorithm):
