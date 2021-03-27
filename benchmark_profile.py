@@ -32,5 +32,5 @@ args = parser.parse_args()
 cProfile.run('main.main(args)', 'benchmark_data')
 
 p = pstats.Stats('benchmark_data')
-p.sort_stats('cumulative').print_stats(10)
+p.sort_stats('cumulative').print_stats(20)
 

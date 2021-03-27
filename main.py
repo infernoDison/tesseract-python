@@ -43,6 +43,11 @@ def main(args):
         input_iter = io.read_txt_graph(args.graph)
         for edge in input_iter:
             [u, v] = edge
+
+            # We only use a truncated version of the data
+            #if u >= 1000 or v >= 1000:
+            #    continue
+
             if not G.has_node(u):
                 G.add_node(u)
             if not G.has_node(v):
@@ -66,6 +71,10 @@ def main(args):
         alg = algorithms.CliqueFinding(output, args.max if args.max else None)
     elif args.algorithm == 'cycle':
         alg = algorithms.CycleFinding(output, args.max if args.max else None)
+    elif args.algorithm == 'example_pattern':
+        alg = algorithms.ExamplePatternFinding(output, args.max if args.max else None)
+    elif args.algorithm == 'example_pattern_baseline':
+        alg = algorithms.ExamplePatternFindingBaseline(output, args.max if args.max else None)
     elif args.algorithm.startswith('example'):
         alg = algorithms.ExampleTree(output, args.max if args.max else None)
     else:
@@ -101,6 +110,7 @@ def main(args):
 
         LOG.info('Running middle-out exploration with algorithm \'%s\' and %d updates' % (args.algorithm, len(updates)))
 
+        random.seed(1725)
         random.shuffle(updates)
 
         start = timer()
@@ -111,6 +121,9 @@ def main(args):
             mining.middleout_explore_update(G, alg, update, add_to_graph=True)
             LOG_STATS.debug('Found %d matches' % alg.num_found)
             LOG_STATS.debug('Executed %d filters' % alg.num_filters)
+
+            #if i >= 9999:
+            #    break
         end = timer()
         LOG_STATS.info('Ran middle-out exploration in %0.4f seconds' % (end - start))
         LOG_STATS.info(' - Found %d matches' % alg.num_found)

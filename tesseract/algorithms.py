@@ -1,6 +1,7 @@
 import copy
 import logging
 import math
+import itertools
 
 from tesseract import canonical
 
@@ -106,8 +107,8 @@ class CycleFinding(Algorithm):
             if len(cycle) == len(e):
                 return True
 
-'''
-class ExamplePatternFinding(Algorithm):
+
+class ExamplePatternFindingBaseline(Algorithm):
     def __init__(self, out, max=math.inf):
         super().__init__(out, 4)
 
@@ -118,14 +119,20 @@ class ExamplePatternFinding(Algorithm):
     def process(self, e, G):
         
         if len(e) == 4:
-            ret = ExamplePatternFinding._is_cycle(e, G)
+            ret = ExamplePatternFindingBaseline._is_cycle(e, G)
             if ret == 1:
                 self._inc_found()
+                self.out.found(e, G, tpe='%d-cycle' % len(e))
             elif ret == 2:
                 self._inc_found_x(5)
+
+                # 5 duplicates
+                for i in range(5):
+                    self.out.found(e, G, tpe='%d-cycle' % len(e))
+                
             else:
                 return False
-            self.out.found(e, G, tpe='%d-cycle' % len(e))
+            
 
     @staticmethod
     def _is_cycle(e, G):
@@ -143,7 +150,7 @@ class ExamplePatternFinding(Algorithm):
             return 2
         return 0
 
-'''
+
 class ExamplePatternFinding(Algorithm):
     def __init__(self, out, max=math.inf):
         super().__init__(out, 3)
@@ -159,28 +166,80 @@ class ExamplePatternFinding(Algorithm):
     def process(self, e, G):
         if len(e) == 2:
             neighbor = nx.common_neighbors(G, e[0], e[1])
+
+            neighbor_cp = neighbor
+
+            # Get all pairs of common neighbors
+            rest_patterns = list(itertools.combinations(nx.common_neighbors(G, e[0], e[1]), 2))
+
             x = sum(1 for _ in neighbor)
             if x >= 2:
                 #print(list(neighbor))
                 self._inc_found_x(x * (x-1) / 2)
-                self.out.found(e, G, tpe='%d-found' % len(e))
+
+                for pair in rest_patterns:
+                    full_pattern = e + list(pair)
+                    self.out.found(full_pattern, G, tpe='%d-found' % len(full_pattern))
+                
                 return True
         elif len(e) == 3:
             has_match = False
             neighbor = nx.common_neighbors(G, e[0], e[-1])
+
+            # Get all pairs of common neighbors
+            #rest_patterns = list(itertools.combinations(nx.common_neighbors(G, e[0], e[-1]), 2))
+            '''
             x = sum(1 for _ in neighbor)
             if x >= 2:
                 #print(list(neighbor))
                 self._inc_found_x(x-1)
-                self.out.found(e, G, tpe='%d-found' % len(e))
+                    
+                    #print(full_pattern)
+                    self.out.found(full_pattern, G, tpe='%d-found' % len(full_pattern))
+                
+                #self.out.found(e, G, tpe='%d-found' % len(e))
                 has_match = True
+            '''
+
+            for node in neighbor:
+                if node != e[1]:
+                    self._inc_found()
+                    full_pattern = e + [node]
+                    self.out.found(full_pattern, G, tpe='%d-found' % len(full_pattern))
+                    has_match = True
+            
             neighbor = nx.common_neighbors(G, e[1], e[-1])
+
+            # Get all pairs of common neighbors
+            #rest_patterns = list(itertools.combinations(nx.common_neighbors(G, e[1], e[-1]), 2))
+            
+            '''
             x = sum(1 for _ in neighbor)
             if x >= 2:
                 #print(list(neighbor))
                 self._inc_found_x(x-1)
-                self.out.found(e, G, tpe='%d-found' % len(e))
+
+                for pair in rest_patterns:
+                    full_pattern = e
+                    # We want the one contains e[1] already
+                    if e[1] not in pair:
+                        continue
+                    else:
+                        full_pattern += pair[0] if pair[0] != e[1] else pair[1]
+                    
+                    #print(full_pattern)
+                    self.out.found(full_pattern, G, tpe='%d-found' % len(full_pattern))
+                #self.out.found(e, G, tpe='%d-found' % len(e))
                 has_match = True
+            '''
+            for node in neighbor:
+                if node != e[0]:
+                    self._inc_found()
+                    full_pattern = e + [node]
+                    self.out.found(full_pattern, G, tpe='%d-found' % len(full_pattern))
+                    has_match = True
+            
+
             return has_match
         return False
 
