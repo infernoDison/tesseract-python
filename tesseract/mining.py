@@ -65,52 +65,94 @@ def backwards_explore_update(G, alg, edge, add_to_graph=True):
         G.remove_edge(edge[0], edge[1])
 
 
-def middleout_explore(G, alg, c, ignore=[]):
+def middleout_explore(G, alg, c, ignore=[], mo=True, left=False, right=False):
 
     # c: start as a single edge e.g. (0,1) and every recursion adds a 
     # neighbour to it
-
+    # print(c)
     # Reaches the base case when the maximum size clique is found
-    if len(c) > alg.max:
+    print('middleout_explore with c: ', c, mo, left, right)
+
+    alg.process(c, G, mo, left, right)
+
+    if mo and len(c) == alg.max:
+        #print('stop by max of ', alg.max)
+        return
+    elif not mo and len(c) == alg.max + 1:
+        #print('stop by max of ', alg.max, '+1')
         return
     else:
-        alg.process(c, G)
         # Get all the connected neighbour vertex of the edge
-        V = set(graph.neighborhood(c, G))
+        #V = set(G.neighbors(c[-1]))
+        if mo:
+            V = set(graph.neighborhood(c, G))
+        else:
+            V_ori = set(graph.neighborhood(c[2:], G))
+            V = set(graph.neighborhood(c[2:], G))
+            V_left = graph.neighborhood(c[0], G)
+            V_right = graph.neighborhood(c[1], G)
+            if left:
+                V.update(V_left)
+            if right:
+                V.update(V_right)
+        #print(G.edges(c))
+        #print(V)
+        #input("Press Enter to continue...2")
         for v in V:
-            #print(c)
-            #print(G.edges(c))
-            #print(v)
-            #print(V)
-            #input("Press Enter to continue...2")
             # If the edge c does not contain the vertex
             if v not in c:
                 if canonical.canonical_r2(c, v, G, ignore=ignore):
+                    #print(v)
+                    #input("Press Enter to continue...3")
                     c.append(v)
                     LOG.debug('%s %s' %(str(c), 'F'))
 
                     # Check if the neighor is connected to any sides of the edge
                     if alg.filter(c, G, v):
-
                         # For cliques, we find a n-d clique
                         #alg.process(c, G)
 
                         # Keep going to find a larger clique
-                        middleout_explore(G, alg, c, ignore=ignore)
+                        new_left = False
+                        new_right = False
+                        if not mo and v in V_ori:
+                            new_left = left
+                            new_right = right
+                            if v in V_left:
+                                new_left = True
+                            if v in V_right:
+                                new_right = True
+                        elif not mo:
+                            if v in V_left and v in V_right:
+                                new_left = left
+                                new_right = right
+                            else:
+                                if v in V_left:
+                                    new_left = True
+                                if v in V_right:
+                                    new_right = True
+
+                        middleout_explore(G, alg, c, ignore=ignore, mo=mo, left=new_left, right=new_right)
                     c.pop()
                 else:
                     LOG.debug('%s %s' %(str(c), 'R'))
 
 
 def middleout_explore_update(G, alg, edge, add_to_graph=True):
-    #print(edge)
-    #print(len(edge))
+    print("Add edge:" + str(edge))
     #input("Press Enter to continue...1")
     if len(edge) != 2:
         return
     G.add_edge(edge[0], edge[1])
 
     # I think the "ignore" here prevent redundant exploration
-    middleout_explore(G, alg, edge, ignore=[edge[1]])
+
+    # 1st time call: try to use the new edge as a part of the matching order
+    middleout_explore(G, alg, edge, ignore=[edge[1]], mo=True)
+
+    # 2nd time call: extend the edge in a different direction as the matching order
+    #if alg.matching_order_size > 2:
+    middleout_explore(G, alg, edge, ignore=[edge[1]], mo=False, left=True, right=True)
+
     if not add_to_graph:
         G.remove_edge(edge[0], edge[1])

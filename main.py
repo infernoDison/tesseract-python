@@ -77,6 +77,8 @@ def main(args):
         alg = algorithms.ExamplePatternFindingBaseline(output, args.max if args.max else None)
     elif args.algorithm.startswith('example'):
         alg = algorithms.ExampleTree(output, args.max if args.max else None)
+    elif args.algorithm == 'peregrine':
+        alg = algorithms.PeregrinePatternMatching(output, 'test_patterns/pattern_report_p1.adjlist',args.max if args.max else None)
     else:
         alg = algorithms.Algorithm(output, args.max if args.max else None)
 
@@ -108,6 +110,8 @@ def main(args):
                         valid = True
                         updates.append(edge)
 
+        #if args.graph == 'example.txt':
+        #    updates = [[3,5]]
         LOG.info('Running middle-out exploration with algorithm \'%s\' and %d updates' % (args.algorithm, len(updates)))
 
         random.seed(1725)

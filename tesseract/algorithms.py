@@ -7,6 +7,8 @@ from tesseract import canonical
 
 import networkx as nx
 
+import parse_pattern 
+
 
 class Algorithm:
     def __init__(self, out, max=math.inf):
@@ -272,3 +274,233 @@ class ExampleTree(Algorithm):
         if len(e) == self.max:
             self._inc_found()
             self.out.found(e, G, tpe='tree')
+
+    
+class PeregrinePatternMatching(Algorithm):
+    def __init__(self, out, pattern_path, max=math.inf):
+
+        P = nx.read_adjlist(pattern_path)
+        
+        self.exclusive_neighbors = {}
+        self.common_neighbors = {}
+
+        # TODO: For the current test patterns, all matching orders are simple
+        plan = parse_pattern.get_hierarchical_mcvc(P)[0]
+
+        self.matching_order_size = len(plan.keys())
+
+        # The middle out terminates when we have more nodes than matching_order_size
+        super().__init__(out, self.matching_order_size)
+
+        for vertex in plan.keys():
+
+            if plan[vertex]['exclusive'] != 0:
+                self.exclusive_neighbors[vertex] = plan[vertex]['exclusive']
+        
+            sharing_with = plan[vertex]['common']
+
+            if sharing_with:
+                for sharing_nodes in sharing_with:
+                    self.common_neighbors[vertex] = sharing_with
+
+        self.max = self.matching_order_size
+        self.print()
+
+    def print(self):
+        print(self.matching_order_size)
+        print(self.exclusive_neighbors)
+        print(self.common_neighbors)
+
+    '''
+    filter is designed to find the matching order only
+    '''
+    def filter(self, e, G, last_v):
+        super()._inc_filter()
+
+        #if len(e) > self.matching_order_size:
+        #    return False
+
+        return True
+
+    def process(self,e,G,mo,left,right):
+
+        my_mos = []
+        nodes_removed = []
+
+        if mo:
+   
+            if len(e) != self.matching_order_size:
+                return False
+            else:
+                #print('mo', e)  
+                my_mos.append(e)
+        else:
+            if len(e) != self.matching_order_size + 1:
+                return False
+            if left:
+                t = e[:1] + e[2:]
+                if len(t) > 2:
+                    H = G.subgraph(t)
+                    new_e = parse_pattern.sort_chain(H)
+                    my_mos.append(new_e)
+                    nodes_removed.append(e[1])
+
+                    my_mos.append(list(reversed(new_e)))
+                    nodes_removed.append(e[1])
+                else:  
+                #print('mo', e[:1] + e[2:])
+                    my_mos.append(e[:1] + e[2:])
+                    nodes_removed.append(e[1])
+            if right:
+                t = e[1:]
+                print("t" + str(t))
+                if len(t) > 2:
+                    H = G.subgraph(t)
+                    print(H)
+                    new_e = parse_pattern.sort_chain(H)
+                    my_mos.append(new_e)
+                    nodes_removed.append(e[0])
+
+                    my_mos.append(list(reversed(new_e)))
+                    nodes_removed.append(e[0])
+                else:  
+                #print('mo', e[:1] + e[2:])
+                    my_mos.append(e[1:])
+                    nodes_removed.append(e[0])
+
+
+        print(my_mos)
+        print(nodes_removed)
+
+
+        for i, my_mo in enumerate(my_mos):
+            print(my_mo)
+
+            # Here we have a valid matching order
+            # We need to check if we can construct the pattern from it
+
+            # First, go over the exclusive neighbors
+            total_en_combinations = 1
+            
+            premature_exit = False
+            for index in self.exclusive_neighbors:
+
+                if self.exclusive_neighbors[index] == 0:
+                    continue
+
+                # Corresponding node in the matching order
+                cur_vertex = my_mo[index]
+                
+                # Neighbors of the current node in the matching order
+                neighbors = G.neighbors(cur_vertex)
+
+                en = []
+                for neighbor in neighbors:
+                    if neighbor not in my_mo:
+                        en.append(neighbor)
+
+                num_en = len(en)
+                print("en:" + str(en))
+                en_requirement = self.exclusive_neighbors[index]
+
+                if num_en < en_requirement:
+                    print("Too few exclusive neighbors for the %d th node " % (index))
+                    premature_exit = True
+                    break
+                
+                print("Exclusive neighbors for the %d th node: %d" % (index, num_en))
+
+                # Compute how many combinations (aka matches) we can get for the exclusive neighbors
+                en_combination = parse_pattern.nCk(num_en, en_requirement)
+                total_en_combinations = total_en_combinations * en_combination
+            
+            cn_combinations_list = []
+            no_new_match = True
+
+            # The exclusive neighbor constraints have already failed
+            # No need to check the common neighbors
+            if premature_exit:
+                continue
+            else:
+                premature_exit = False
+
+            for index in self.common_neighbors:
+                
+                if premature_exit:
+                    # One of the common_neighbor constraint has failed
+                    break
+
+                # Corresponding node in the matching order
+                cur_vertex = my_mo[index]
+
+                # A node will share common neighbors with different sets of other nodes
+                # in the matching order
+                for sharing_with in self.common_neighbors[index]:
+                    #input("Press enter to continue:")
+        
+                    if type(sharing_with) is int:
+                        cn = set(nx.common_neighbors(G, cur_vertex, my_mo[sharing_with]))
+                    else:
+                        cn = None
+                        # Iterate through others nodes in each set
+                        for node_index in sharing_with:
+                            node = my_mo[node_index]
+                            shared_neighbors = nx.common_neighbors(G, cur_vertex, node)
+
+                            if not cn:
+                                cn = set(shared_neighbors)
+                            else:
+                                cn = cn.intersection(shared_neighbors)
+
+                            # Since we only store non-zero common neighbors, we can exit if 
+                            # none is found
+                            if len(cn) == 0:
+                                break 
+                    
+                    # discard the common neighbors that are from the mo
+                    for node in my_mo:
+                        cn.discard(node)
+
+                    print(cn)
+                    num_cn = len(cn)
+                    cn_requirement = self.common_neighbors[index][sharing_with]
+                    # One of the common neighbor requirement is not satisfied
+                    if num_cn < cn_requirement:
+                        premature_exit = True
+                        break 
+                        
+                    print("Common-neighbor constraint for %d th node with nodes %s is satisfied " % 
+                        (index,str(sharing_with)))
+
+                    # If the newly introduced edge does not belong to any pattern found
+                    cn_combination = parse_pattern.nCk(num_cn,cn_requirement)
+                    if mo:
+                        print("This is a matching order")
+                        print(cn_combination)
+                        pass
+                    elif nodes_removed[i] not in cn:
+                        print("Not a new match")
+                        cn_combination = 0
+                    elif num_cn == cn_requirement:
+                        cn_combination = 1
+                    elif num_cn > cn_requirement:
+                        cn_combination = num_cn - 1
+
+                    if cn_combination > 0:
+                        no_new_match = False
+                        cn_combinations_list.append(cn_combination)
+
+            print(cn_combinations_list)
+            total_cn_combinations = 1
+            if no_new_match or premature_exit:
+                total_cn_combinations = 0
+            else:
+                for el in cn_combinations_list:
+                    total_cn_combinations *= el
+
+            total_matches = total_en_combinations * total_cn_combinations 
+
+            if total_matches > 0:               
+                super()._inc_found_x(total_matches)
+                print("We found %d matches with matching order %s" % (total_matches, str(my_mo)))
+        
